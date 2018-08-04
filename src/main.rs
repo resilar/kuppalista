@@ -84,7 +84,7 @@ where I: AsyncRead + AsyncWrite + 'static
                 Ok(Async::Ready(io))
             },
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => { println!("HTTP error: {}", e); Err(()) }
+            Err(e) => { eprintln!("HTTP error: {}", e); Err(()) }
         }
     })
 }
@@ -161,7 +161,7 @@ where I: AsyncRead + AsyncWrite + 'static
             println!("Connection {} closed.", addr);
             Ok(())
         })
-    }).or_else(|e| Err(println!("{}", e)))
+    }).or_else(|e| Err(eprintln!("{}", e)))
 }
 
 fn main()
@@ -175,7 +175,7 @@ fn main()
         Ok(x) => x,
         Err(ParseError::NoArgs) => {
             let arg0 = env::args().next().unwrap_or("./a.out".to_string());
-            eprintln!("{}", Args::usage(&arg0));
+            println!("{}", Args::usage(&arg0));
             return;
         },
         Err(e) => { eprintln!("{}", e); return; }
@@ -198,7 +198,7 @@ fn main()
                     handle_http(tls_stream).and_then(move |io| handle_websocket(io, addr, state))
                 );
                 Ok(())
-            }).or_else(|e| { println!("Error: {}", e); Ok(()) })
+            }).or_else(|e| { eprintln!("Error: {}", e); Ok(()) })
         };
         core.run(listener.incoming().for_each(tls_handler)).unwrap();
     } else {
