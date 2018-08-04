@@ -10,26 +10,12 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
 
-struct StateBuffer {
-    mmap: MmapMut,
-    size: usize // Padded size
-}
-
-impl StateBuffer {
-    pub fn map(file: &File, len: usize) -> std::io::Result<StateBuffer> {
-        let size = 4096 * (1 + (std::cmp::max(len, 1)-1) / 4096); // Align to page boundary
-        let mmap = unsafe { MmapOptions::new().len(size as usize).map_mut(file)? };
-        Ok(StateBuffer { mmap, size })
-    }
-}
-
 /// State consists of connection information and list items.
 pub struct State {
     pub connections: HashMap<SocketAddr, UnboundedSender<Message>>,
     pub password: Option<String>,
     file: File,
-    buffer: StateBuffer,
-    json_len: usize
+    mmap: Option<MmapMut>
 }
 
 /// Initial state items.
@@ -46,14 +32,13 @@ impl State {
         file.try_lock_exclusive()?;
 
         if !exists { file.set_len(len as u64)?; }
-        let mut buffer = StateBuffer::map(&file, len)?;
-        if !exists { buffer.mmap[..len as usize].copy_from_slice(JSON_INIT.as_ref()); }
+        let mut mmap = State::map(&file, len)?;
+        if !exists { mmap.copy_from_slice(JSON_INIT.as_ref()); }
 
         Ok(State {
             connections: HashMap::new(),
             file: file,
-            buffer: buffer,
-            json_len: len,
+            mmap: Some(mmap),
             password: password
         })
     }
@@ -61,17 +46,20 @@ impl State {
     /// Set JSON state.
     pub fn set_json(&mut self, json: &str) -> std::io::Result<()> {
         let len = json.len();
+        drop(self.mmap.take());
         self.file.set_len(len as u64)?;
-        if len > self.buffer.size {
-            std::mem::replace(&mut self.buffer, StateBuffer::map(&self.file, len)?);
-        }
-        self.buffer.mmap[..len as usize].copy_from_slice(json.as_ref());
-        self.json_len = json.len();
+        let mut mmap = State::map(&self.file, len)?;
+        mmap.copy_from_slice(json.as_ref());
+        std::mem::replace(&mut self.mmap, Some(mmap));
         Ok(())
     }
 
     /// Get JSON state.
     pub fn get_json(&self) -> String {
-        String::from_utf8_lossy(&self.buffer.mmap[..self.json_len]).to_string()
+        String::from_utf8_lossy(self.mmap.as_ref().unwrap()).to_string()
+    }
+
+    fn map(file: &File, len: usize) -> std::io::Result<MmapMut> {
+        Ok(unsafe { MmapOptions::new().len(len).map_mut(file)? })
     }
 }
