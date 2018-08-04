@@ -33,7 +33,7 @@ pub struct State {
 }
 
 /// Initial state items.
-static JSON_INIT: &'static str = r#"[{"html":"Apples","checked":false},{"html":"Butter","checked":false},{"html":"Coke","checked":false}]"#;
+static JSON_INIT: &'static str = r#"[{"html":"Apples","checked":false},{"html":"Bacon","checked":false},{"html":"Coke","checked":false}]"#;
 
 impl State {
     /// Parameter json_path specifies memory-mapped file for storing the state.
