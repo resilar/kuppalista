@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kuppalista</title>
+    <style type="text/css">
+body {
+  text-align: center;
+}
+
+#list div.item {
+  background-color: #eee;
+  border: 1px solid #555;
+  margin: 8px 0px;
+  padding: 4px 10%;
+  border-radius: 4px;
+}
+
+#list div.item:hover {
+  box-shadow: inset -1px -1px 1px 1px #ccc;
+}
+
+#list div.target {
+  border: 1px dashed #000 !important;
+}
+
+#list div.checked {
+  text-decoration: line-through;
+  text-shadow: 2px 2px 8px #888;
+  color: #777;
+  border: 1px dotted #000;
+}
+
+#list div span {
+  padding: 4px 20px;
+}
+
+#list div span:hover {
+  text-shadow: 1px 1px 4px #999;
+}
+
+#add {
+  background-color: #ccc;
+  background-image: linear-gradient(to bottom, #eee, #ccc);
+  width: 100%;
+  padding: 4px;
+  margin-bottom: 4px;
+}
+
+.hidden {
+  display: none;
+}
+    </style>
+  </head>
+  <body>
+    <noscript>window.alert("Enable JavaScript");</noscript>
+    <div id="container" class="hidden">
+      <div id="list">
+        <!-- <div class="item"><span contenteditable="true">item</span></div> -->
+      </div>
+      <button id="add" type="submit" autofocus>+</button>
+      <button id="delete" type="submit">-</button>
+    </div>
+    <div id="log"></div>
+    <div id="offline" class="hidden">
+      <p>Error connecting to WebSocket backend, you're fucked.</p>
+      <p>Maybe the server is down or it requires a password?</p>
+      <p><a href="#" id="toy">Try offline mode with toy data.</a></p>
+    </div>
+    <script type="text/javascript">
+var protocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+var host = window.location.host;
+var wsURL = protocol + '//' + host + '/';
+//var wsURL = "ws://127.0.0.1:26727";
+
+function log(msg) {
+  console.log(msg);
+  var div = document.getElementById('log');
+  if (div) div.innerHTML += '<p>' + msg + '</p>';
+}
+
+function logClear() { 
+  var div = document.getElementById('log');
+  if (div) div.innerHTML = '';
+}
+
+var socket;
+var reconnectTimeout;
+var connected = false;
+var hasConnected = false;
+var password = window.location.hash.substring(1) || undefined;
+function connect() {
+  var msg = "Connecting to " + wsURL;
+  if (password) { msg += " with password '" + password + "'"; }
+  msg += " ...";
+  log(msg);
+
+  socket = new WebSocket(wsURL, password);
+
+  socket.onopen = function(open) {
+    if (!open || !open.target || open.target.readyState !== 1) {
+      if (!hasConnected)
+        offlineMode();
+      return;
+    }
+    log('Connected to ' + this.url);
+    reconnectTimeout = 10000;
+    onlineMode();
+  };
+
+  socket.onerror = function(error) {
+    console.log('socket.onerror()');
+  };
+
+  socket.onclose = function(close) {
+    console.log('socket.onclose()');
+    if (connected) {
+      if (reconnectTimeout > 10000) {
+        var div = document.getElementById('log');
+        div.children[div.children.length-1].innerHTML += " FAIL!"
+      } else {
+        log('Disconnected!');
+      }
+      log('Reconnecting in ' + reconnectTimeout/1000 + ' seconds.');
+
+      setTimeout(function() { socket = connect(); }, reconnectTimeout);
+
+      if (reconnectTimeout < 40000) {
+        reconnectTimeout *= 2;
+      } else {
+        connected = false;
+      }
+    } else {
+      offlineMode();
+    }
+  };
+
+  socket.onmessage = function(message) {
+    console.log('socket.onmessage()');
+    try {
+      var state = JSON.parse(message.data);
+      if (restoreState(state)) {
+        hasConnected = true;
+        connected = true;
+      } else {
+        console.error('Bad JSON from WebSocket server ' + this.url);
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
+  return socket;
+}
+connect();
+
+var oldState = '[]';
+function stateJSON() {
+  var state = [];
+  document.getElementById('list');
+  for (var i = 0; i < list.childElementCount; i++) {
+    var div = list.children[i];
+    var span = div.getElementsByTagName('span')[0];
+    var item = {
+      html: span.innerHTML,
+      checked: div.classList.contains('checked')
+    };
+    state.push(item);
+  }
+  return JSON.stringify(state);
+}
+
+function restoreState(state) {
+  var validateItem = function(obj) {
+    return obj.hasOwnProperty('checked') && obj.hasOwnProperty('html');
+  };
+  try {
+    if (Array.isArray(state) && state.every(validateItem)) {
+      oldState = JSON.parse(stateJSON());
+      if (oldState.length != state.length) {
+        document.getElementById('list').innerHTML = '';
+        for (var i = 0; i < state.length; i++) {
+          createListItem(state[i].html, state[i].checked);
+        }
+      } else {
+        var divs = document.getElementById('list').getElementsByTagName('div');
+        for (var i = 0; i < list.childElementCount; i++) {
+          if (state[i].html != oldState[i].html) {
+            divs[i].firstChild.innerHTML = state[i].html;
+          }
+          if (state[i].checked != oldState[i].checked) {
+            var checked = state[i].checked;
+            divs[i].setAttribute('class', (checked ? 'item checked' : 'item'));
+          }
+        }
+      }
+      return true;
+    }
+  } catch(e) {
+    console.error(e);
+  }
+  return false;
+}
+
+function synchronize() {
+  var state = stateJSON();
+  if (state != oldState) {
+    if (connected)
+      socket.send(state);
+    oldState = state;
+  }
+}
+
+var editTimeout = undefined;
+function createListItem(text, checked, editable) {
+  var list = document.getElementById('list');
+  var div = document.createElement('div');
+  div.setAttribute('class', (checked ? 'item checked' : 'item'));
+  var span = document.createElement('span');
+  span.setAttribute('contenteditable', (editable ? 'true' : 'false'));
+  span.setAttribute('spellcheck', 'false');
+  span.innerHTML = text;
+  span.addEventListener('keydown', function(event) {
+    if (event.keyCode == 13 && !event.shiftKey) {
+      event.preventDefault();
+      this.blur();
+    }
+  });
+  span.addEventListener('focusin', function(event) {
+    if (editTimeout) {
+      div.classList.toggle('checked');
+      clearTimeout(editTimeout);
+      editTimeout = undefined;
+    }
+  });
+  span.addEventListener('focusout', function(event) {
+    span.setAttribute('contenteditable', 'false');
+  });
+  span.addEventListener('input', synchronize);
+  div.appendChild(span);
+  list.appendChild(div);
+  return div;
+}
+
+var onlineMode = function() {
+  logClear();
+  document.getElementById('container').classList.remove('hidden');
+  document.getElementById('offline').classList.add('hidden');
+}
+
+var offlineMode = function() {
+  document.getElementById('container').classList.add('hidden');
+  document.getElementById('offline').classList.remove('hidden');
+}
+
+document.getElementById('add').addEventListener('click', function(event) {
+  var div = createListItem('', false, true);
+  div.getElementsByTagName('span')[0].focus();
+  div.classList.remove('checked');
+  synchronize();
+});
+
+document.getElementById('delete').addEventListener('click', function(event) {
+  var list = document.getElementById('list');
+  var count = list.childElementCount;
+  var i = count;
+  while (i > 0) {
+    var child = list.children[i-1];
+    if (child.classList.contains('checked'))
+      list.removeChild(child);
+    i--;
+  }
+  if (count != list.childElementCount) {
+    synchronize();
+  }
+});
+
+document.getElementById('toy').addEventListener('click', function(event) {
+  document.getElementById('list').innerHTML = '';
+  createListItem('Apples');
+  createListItem('Bacon');
+  createListItem('Coke');
+  onlineMode();
+  log('OFFLINE MODE');
+});
+
+var target = undefined; // node being dragged
+var start = { x: undefined, y: undefined }; // down
+var click = true;
+
+function setTarget(element) {
+  if (target && element && target != element) {
+    // Swap target & element
+    var parent = target.parentNode;
+    if (parent) {
+      var sibling = target.nextSibling;
+      if (sibling && sibling.isSameNode(element))
+        sibling = target;
+      parent.insertBefore(parent.replaceChild(target, element), sibling);
+    }
+  } else {
+    if (target) {
+      target.classList.remove('target');
+      target = undefined;
+    }
+    if (element) {
+      target = element;
+      target.classList.add('target');
+    }
+  }
+}
+
+function checkCoordinates(xy) {
+  if (click) {
+    var dx = Math.abs(xy.x - start.x);
+    var dy = Math.abs(xy.y - start.y);
+    if (dx*dx + dy*dy > 16) {
+      click = false;
+    }
+  }
+}
+
+function pointFromEvent(event) {
+  if (event.touches && event.touches.length === 1)
+    return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  if (event.clientX && event.clientY)
+    return { x: event.clientX, y: event.clientY };
+  return undefined;
+}
+
+function itemFromPoint(x, y) {
+  var element = document.elementFromPoint(x, y);
+  if (element && element.tagName == 'SPAN')
+    element = element.parentElement;
+  return (element && element.tagName == 'DIV'
+                  && element.classList.contains('item')
+                  && element != target) ? element : undefined;
+}
+
+function onstart(event) {
+  document.activeElement.blur();
+  var xy = pointFromEvent(event);
+  if (xy) {
+    var item = itemFromPoint(xy.x, xy.y);
+    if (item) {
+      var span = document.elementFromPoint(xy.x, xy.y);
+      if (span && span.tagName == 'SPAN') {
+        if (span.getAttribute('contenteditable') == 'true') {
+          return;
+        }
+      }
+
+      if (target != item) {
+        start = xy;
+        click = true;
+        setTarget(item);
+        event.preventDefault();
+      }
+    }
+  }
+}
+document.addEventListener('mousedown', onstart);
+document.addEventListener('touchstart', onstart, { passive: false });
+
+function onmove(event) {
+  if (target) {
+    var xy = pointFromEvent(event);
+    if (xy) {
+      checkCoordinates(xy);
+      var item = itemFromPoint(xy.x, xy.y);
+      if (item) {
+        setTarget(item);
+        event.preventDefault();
+      }
+    }
+  }
+}
+document.addEventListener('mousemove', onmove);
+document.addEventListener('touchmove', onmove, { passive: false });
+
+function onend(event) {
+  if (target) {
+    var xy = pointFromEvent(event);
+    if (xy) checkCoordinates(xy);
+    if (click) {
+      var span = target.getElementsByTagName('span')[0];
+      if (span && span.getAttribute('contenteditable') != 'true') {
+        span.setAttribute('contenteditable', 'true');
+        target.classList.toggle('checked');
+        editTimeout = setTimeout(function() {
+          span.setAttribute('contenteditable', 'false');
+        }, 1000);
+      } else {
+        target.classList.toggle('checked');
+      }
+    }
+  }
+
+  setTarget(null);
+  synchronize();
+}
+document.addEventListener('mouseup', onend);
+document.addEventListener('touchcancel', onend);
+document.addEventListener('touchend', onend);
+    </script>
+  </body>
+</html>
