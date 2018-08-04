@@ -85,6 +85,17 @@ function logClear() {
   if (div) div.innerHTML = '';
 }
 
+var onlineMode = function() {
+  logClear();
+  document.getElementById('container').classList.remove('hidden');
+  document.getElementById('offline').classList.add('hidden');
+}
+
+var offlineMode = function() {
+  document.getElementById('container').classList.add('hidden');
+  document.getElementById('offline').classList.remove('hidden');
+}
+
 var socket;
 var reconnectTimeout;
 var connected = false;
@@ -96,7 +107,12 @@ function connect() {
   msg += " ...";
   log(msg);
 
-  socket = new WebSocket(wsURL, password);
+  try {
+    socket = new WebSocket(wsURL, password);
+  } catch(e) {
+    offlineMode();
+    return undefined;
+  }
 
   socket.onopen = function(open) {
     if (!open || !open.target || open.target.readyState !== 1) {
@@ -241,17 +257,6 @@ function createListItem(text, checked, editable) {
   div.appendChild(span);
   list.appendChild(div);
   return div;
-}
-
-var onlineMode = function() {
-  logClear();
-  document.getElementById('container').classList.remove('hidden');
-  document.getElementById('offline').classList.add('hidden');
-}
-
-var offlineMode = function() {
-  document.getElementById('container').classList.add('hidden');
-  document.getElementById('offline').classList.remove('hidden');
 }
 
 document.getElementById('add').addEventListener('click', function(event) {
