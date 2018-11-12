@@ -1,4 +1,4 @@
-use native_tls::Pkcs12;
+use native_tls::Identity;
 use rpassword;
 
 use std;
@@ -38,7 +38,7 @@ impl fmt::Display for ParseError {
 
 /// Parsed command-line arguments.
 pub struct Args {
-    pub pkcs12: Option<Pkcs12>,
+    pub pkcs12: Option<Identity>,
     pub addr: SocketAddr,
     pub password: Option<String>
 }
@@ -76,7 +76,7 @@ impl Args {
 
                         eprint!("Password for {}: ", arg1);
                         let input = rpassword::read_password()?;
-                        if let Ok(pkcs12) = Pkcs12::from_der(&buffer, input.trim()) {
+                        if let Ok(pkcs12) = Identity::from_pkcs12(&buffer, input.trim()) {
                             Ok(Args { pkcs12: Some(pkcs12), addr: addr, password: password })
                         } else {
                             Err(Other("Incorrect password for PKCS12 archive".to_string()))

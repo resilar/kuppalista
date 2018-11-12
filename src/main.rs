@@ -26,11 +26,9 @@ use hyper::header::{self};
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, StatusCode};
-use native_tls::TlsAcceptor;
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Core;
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_tls::TlsAcceptorExt;
 use tokio_tungstenite::accept_hdr_async;
 use tungstenite::protocol::Message;
 
@@ -189,11 +187,12 @@ fn main()
              args.addr);
 
     if let Some(pkcs12) = args.pkcs12 {
-        let acceptor = TlsAcceptor::builder(pkcs12).unwrap().build().unwrap();
+        let acceptor = native_tls::TlsAcceptor::new(pkcs12).unwrap();
+        let acceptor = tokio_tls::TlsAcceptor::from(acceptor);
         let tls_handler = |(tcp_stream, addr)| {
             let state = state.clone();
             let handle = handle.clone();
-            acceptor.accept_async(tcp_stream).and_then(move |tls_stream| {
+            acceptor.accept(tcp_stream).and_then(move |tls_stream| {
                 handle.spawn(
                     handle_http(tls_stream).and_then(move |io| handle_websocket(io, addr, state))
                 );
