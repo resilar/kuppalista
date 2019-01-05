@@ -166,7 +166,7 @@ fn main()
 {
     fn prepare_args_and_state() -> std::result::Result<(Args, StateRef), ParseError> {
         let args = Args::parse(env::args())?;
-        let state = State::new("state.json", args.password.clone())?;
+        let state = State::new("state.json.bin", args.password.clone())?;
         Ok((args, Rc::new(RefCell::new(state))))
     }
     let (args, state) = match prepare_args_and_state() {
