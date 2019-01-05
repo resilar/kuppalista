@@ -85,7 +85,7 @@ impl State {
         if len < size { buf[len] = 0; }
         self.len = len;
 
-        Ok(())
+        buf.flush()
     }
 
     /// Get JSON state.
