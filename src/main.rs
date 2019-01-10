@@ -22,7 +22,7 @@ use state::State;
 
 use futures::stream::Stream;
 use futures::{Async, Future, Sink};
-use hyper::header::{self};
+use hyper::header;
 use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, StatusCode};
