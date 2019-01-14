@@ -1,6 +1,6 @@
 [package]
 name = "kuppalista"
-version = "0.1.0"
+version = "1.0.0-rc"
 authors = ["def <def@huumeet.info>"]
 description = "Real-time shopping list"
 
@@ -20,7 +20,7 @@ tokio-tungstenite = "0.6"
 tungstenite = "0.6"
 
 [patch.crates-io]
-tungstenite = { git = 'https://github.com/resilar/tungstenite-rs', branch = 'patch-1' }
+tungstenite = { git = 'https://github.com/snapview/tungstenite-rs', rev = 'c33f4f3895ccedf1f370b8b675bf980257f6c3f4' }
 
 [features]
 default = ["verbose"]
