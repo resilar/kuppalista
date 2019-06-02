@@ -1,6 +1,6 @@
 [package]
 name = "kuppalista"
-version = "1.0.0-rc"
+version = "1.0.0"
 authors = ["def <def@huumeet.info>"]
 description = "Real-time shopping list"
 
