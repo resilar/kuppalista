@@ -12,15 +12,12 @@ httparse = "1.3"
 hyper = "0.12"
 memmap = "0.7"
 native-tls = "0.2"
-rpassword = "2.1"
+rpassword = "3.0"
 tokio-core = "0.1"
 tokio-io = "0.1"
 tokio-tls = "0.2"
-tokio-tungstenite = "0.6"
-tungstenite = "0.6"
-
-[patch.crates-io]
-tungstenite = { git = 'https://github.com/snapview/tungstenite-rs', rev = 'c33f4f3895ccedf1f370b8b675bf980257f6c3f4' }
+tokio-tungstenite = "0.8"
+tungstenite = "0.8"
 
 [features]
 default = ["verbose"]

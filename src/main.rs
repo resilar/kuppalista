@@ -32,7 +32,6 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::accept_hdr_async;
 use tungstenite::protocol::Message;
 
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::convert::From;
 use std::env;
@@ -90,7 +89,7 @@ where I: AsyncRead + AsyncWrite + 'static
 fn handle_websocket<I>(io: I, addr: SocketAddr, state: StateRef) -> impl Future<Item=(), Error=()>
 where I: AsyncRead + AsyncWrite + 'static
 {
-    use tungstenite::handshake::server::{Callback, Request};
+    use tungstenite::handshake::server::{Callback, ErrorResponse, Request};
 
     /// Accept connection if WebSocket subprotocol matches self.0 (password).
     struct ProtocolChecker(Option<String>);
@@ -99,7 +98,7 @@ where I: AsyncRead + AsyncWrite + 'static
         fn on_request(
             self,
             req: &Request
-        ) -> Result<Option<Vec<(String, String)>>, tungstenite::Error> {
+        ) -> Result<Option<Vec<(String, String)>>, ErrorResponse> {
             let mut protocols = req.headers.iter()
                 .filter(|(k, _)| k.eq_ignore_ascii_case("Sec-Websocket-Protocol"))
                 .filter_map(|(_, v)| std::str::from_utf8(v).ok())
@@ -108,7 +107,11 @@ where I: AsyncRead + AsyncWrite + 'static
                 if let Some(p) = protocols.find(move |&v| v == protocol) {
                     Ok(Some(vec![("Sec-Websocket-Protocol".to_string(), p.to_string())]))
                 } else {
-                    Err(tungstenite::Error::Protocol(Cow::Borrowed("Bad WebSocket subprotocol")))
+                    Err(ErrorResponse {
+                        error_code: StatusCode::FORBIDDEN,
+                        headers: None,
+                        body: Some("Bad WebSocket subprotocol".to_string())
+                    })
                 }
             } else if let Some(p) = protocols.next() {
                 // Protocol not required but the client provided one.

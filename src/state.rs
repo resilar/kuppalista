@@ -45,7 +45,7 @@ impl State {
             let file_len = fs::metadata(json_path)?.len() as usize;
             let size = align_len(file_len);
             if file_len != size { file.set_len(size as u64)?; }
-            let mut mmap = map(&file, size)?;
+            let mmap = map(&file, size)?;
             let len = mmap.iter().position(|&x| x == 0).unwrap_or(size);
             (mmap, len, size)
         } else {
