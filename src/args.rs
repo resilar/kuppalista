@@ -1,37 +1,38 @@
+use clap::{App, Arg};
 use native_tls::Identity;
 use rpassword;
 
-use std;
 use std::fmt;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::net::SocketAddr;
 
 /// Parsing errors.
 #[derive(Debug)]
-pub enum ParseError {
-    NoArgs,
-    BadArg { idx: usize, arg: String, what: String },
-    UnusedArg { idx: usize, arg: String },
-    IoError(std::io::Error),
-    Other(String)
+pub enum ArgsError {
+    BadBindAddress,
+    P12DecryptError,
+    P12ParseError,
+    IoError(io::Error),
 }
 
-impl From<std::io::Error> for ParseError {
-    fn from(error: std::io::Error) -> Self {
-        ParseError::IoError(error)
+impl From<io::Error> for ArgsError {
+    fn from(error: io::Error) -> Self {
+        ArgsError::IoError(error)
     }
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for ArgsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use ParseError::*;
+        use self::ArgsError::*;
         match *self {
-            NoArgs => f.write_str("No arguments given (want usage)"),
-            BadArg { idx, ref arg, ref what } => write!(f, "{}: '{}' ({})", what, arg, idx),
-            UnusedArg { idx, ref arg } => write!(f, "Unused argument: {} ({})", arg, idx),
-            IoError(ref err) => write!(f, "IO error: {}", err),
-            Other(ref wtf) => f.write_str(&wtf)
+            BadBindAddress => f.write_str("Bad bind address"),
+            P12DecryptError => {
+                f.write_str("Failed to decrypt PKCS #12 archive, incorrect password?")
+            }
+            P12ParseError => f.write_str("Failed to parse PKCS #12 archive"),
+            IoError(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -40,60 +41,78 @@ impl fmt::Display for ParseError {
 pub struct Args {
     pub pkcs12: Option<Identity>,
     pub addr: SocketAddr,
-    pub password: Option<String>
+    pub password: Option<String>,
 }
 
 impl Args {
-    /// Return usage string.
-    pub fn usage(arg0: &str) -> String {
-        format!("usage: {0} [pkcs12] IP:PORT [password]\n \
-                 e.g.: {0} tls.p12 127.0.0.1:8080 hunter2",
-                 arg0)
-    }
+    pub fn parse() -> Result<Args, ArgsError> {
+        use self::ArgsError::*;
 
-    /// Ugly af. Do not try to understand.
-    pub fn parse<I>(mut args: I) -> Result<Args, ParseError> where I: Iterator<Item=String> {
-        use ParseError::*;
+        let matches = App::new(env!("CARGO_PKG_NAME"))
+            .version(env!("CARGO_PKG_VERSION"))
+            .about(env!("CARGO_PKG_DESCRIPTION"))
+            .arg(
+                Arg::with_name("address")
+                    .help("Sets the address to which the web server will be bound")
+                    .value_name("IP:PORT")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("password")
+                    .short("p")
+                    .takes_value(true)
+                    .help("Password to prevent unwanted access"),
+            )
+            .arg(
+                Arg::with_name("pkcs12")
+                    .short("b")
+                    .value_name("FILE")
+                    .takes_value(true)
+                    .help("PKCS #12 bundle for TLS encryption"),
+            )
+            .arg(
+                Arg::with_name("no-decrypt")
+                    .long("no-decrypt")
+                    .help("Disables asking for password to decrypt PKCS #12 bundle"),
+            )
+            .get_matches();
 
-        let _arg0 = args.next();
-        if let Some(arg1) = args.next() {
-            if ["-h", "--help"].iter().any(|h| h == &arg1) { return Err(NoArgs); }
-            if let Ok(addr) = arg1.parse::<SocketAddr>() {
-                let password = args.next();
-                if let Some(arg) = args.next() {
-                    Err(UnusedArg { idx: 3, arg: arg })
+        let addr = matches
+            .value_of("address")
+            .unwrap()
+            .parse::<SocketAddr>()
+            .map_err(|_| BadBindAddress)?;
+
+        let pkcs12 = match matches.value_of("pkcs12") {
+            Some(path) => {
+                let mut file = File::open(path)?;
+                let mut buffer = vec![];
+                file.read_to_end(&mut buffer)?;
+                let decrypt = !matches.is_present("no-decrypt");
+                let password = if decrypt {
+                    eprint!("Password for {}: ", path);
+                    rpassword::read_password()
                 } else {
-                    Ok(Args { pkcs12: None, addr: addr, password: password })
-                }
-            } else if let Some(arg2) = args.next() {
-                let password = args.next();
-                if let Some(arg) = args.next() {
-                    Err(UnusedArg { idx: 4, arg: arg })
-                } else if let Ok(addr) = arg2.parse::<SocketAddr>() {
-                    if let Ok(mut file) = File::open(&arg1) {
-                        let mut buffer = vec![];
-                        file.read_to_end(&mut buffer)?;
-
-                        eprint!("Password for {}: ", arg1);
-                        let input = rpassword::read_password()?;
-                        if let Ok(pkcs12) = Identity::from_pkcs12(&buffer, input.trim()) {
-                            Ok(Args { pkcs12: Some(pkcs12), addr: addr, password: password })
-                        } else {
-                            Err(Other("Incorrect password for PKCS12 archive".to_string()))
-                        }
-                    } else {
-                        Err(BadArg { idx: 1, arg: arg1, what: "Bad PKCS12 archive".to_string() })
-                    }
-                } else if File::open(&arg1).is_err() {
-                    Err(BadArg { idx: 1, arg: arg1, what: "Bad PKCS12 archive".to_string() })
-                } else {
-                    Err(BadArg { idx: 2, arg: arg2, what: "Bad bind address".to_string() })
-                }
-            } else {
-                Err(BadArg { idx: 1, arg: arg1, what: "Bad bind address".to_string() })
+                    Ok("".to_string())
+                };
+                Some(
+                    Identity::from_pkcs12(&buffer, password.unwrap_or("".to_string()).trim())
+                        .map_err(|_| {
+                            if decrypt {
+                                P12DecryptError
+                            } else {
+                                P12ParseError
+                            }
+                        })?,
+                )
             }
-        } else {
-            Err(NoArgs)
-        }
+            _ => None,
+        };
+
+        Ok(Args {
+            pkcs12,
+            addr,
+            password: matches.value_of("password").map(|p| p.to_string()),
+        })
     }
 }
