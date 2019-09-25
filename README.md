@@ -2,15 +2,14 @@
 
 Collaborative shopping list app using Rust, WebSockets and JavaScript.
 
-
 ## Usage
 
 Compile backend with `cargo build` to produce `./kuppalista` server executable.
 Start the server and access the application frontend with a web browser.
 
 ```
-usage: ./kuppalista [pkcs12] IP:PORT [password]
- e.g.: ./kuppalista tls.p12 127.0.0.1:8080 hunter2
+usage: ./kuppalista [-p password] [-b pkcs12] [--no-decrypt] IP:PORT
+ e.g.: ./kuppalista -p hunter2 -b tls.p12 127.0.0.1:8080
 ```
 
 PKCS#12 archive file and password are optional. If password is given, then
@@ -19,7 +18,6 @@ header to establish WebSocket connection to the server. The included frontend
 reads the password from `window.location.hash` so that a properly constructed
 link (e.g., [http://127.0.0.1:8080/#hunter2](http://127.0.0.1:8080/#hunter2))
 grants access to the password-protected shopping list.
-
 
 ## Security (or lack thereof)
 
@@ -31,7 +29,6 @@ broadcasted and shown to all clients. This has obvious security implications
 
 Thus, you probably do not want to make your shopping list public to all
 malicious people on the internet. Use TLS and password protection.
-
 
 ## Screenshot
 
