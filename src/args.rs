@@ -2,6 +2,7 @@ use native_tls::Identity;
 use rpassword;
 
 use std;
+use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
@@ -73,9 +74,10 @@ impl Args {
                     if let Ok(mut file) = File::open(&arg1) {
                         let mut buffer = vec![];
                         file.read_to_end(&mut buffer)?;
-
-                        eprint!("Password for {}: ", arg1);
-                        let input = rpassword::read_password()?;
+                        let input = env::var("PKCS12PASS").or_else(|_| {
+                            eprint!("Password for {}: ", arg1);
+                            rpassword::read_password()
+                        })?;
                         if let Ok(pkcs12) = Identity::from_pkcs12(&buffer, input.trim()) {
                             Ok(Args { pkcs12: Some(pkcs12), addr: addr, password: password })
                         } else {
