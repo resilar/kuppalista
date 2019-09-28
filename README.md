@@ -35,4 +35,4 @@ malicious people on the internet. Use TLS and password protection.
 
 ## Screenshot
 
-![Frontend](https://i.imgur.com/ydxnSIN.jpg)
+![Frontend](https://i.imgur.com/JMfIYP7.png)
