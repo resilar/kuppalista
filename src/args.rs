@@ -2,6 +2,7 @@ use clap::{App, Arg};
 use native_tls::Identity;
 use rpassword;
 
+use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io;
@@ -88,23 +89,18 @@ impl Args {
                 let mut file = File::open(path)?;
                 let mut buffer = vec![];
                 file.read_to_end(&mut buffer)?;
-                let decrypt = !matches.is_present("no-decrypt");
-                let password = if decrypt {
-                    eprint!("Password for {}: ", path);
-                    rpassword::read_password()
+                let identity = if !matches.is_present("no-decrypt") {
+                    let password = env::var("PKCS12PASS")
+                        .or_else(|_| {
+                            eprint!("Password for {}: ", path);
+                            rpassword::read_password()
+                        })
+                        .unwrap_or("".to_string());
+                    Identity::from_pkcs12(&buffer, &password).map_err(|_| P12DecryptError)
                 } else {
-                    Ok("".to_string())
+                    Identity::from_pkcs12(&buffer, "").map_err(|_| P12ParseError)
                 };
-                Some(
-                    Identity::from_pkcs12(&buffer, password.unwrap_or("".to_string()).trim())
-                        .map_err(|_| {
-                            if decrypt {
-                                P12DecryptError
-                            } else {
-                                P12ParseError
-                            }
-                        })?,
-                )
+                Some(identity?)
             }
             _ => None,
         };
