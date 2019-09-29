@@ -17,7 +17,7 @@ pub struct RewindStream<S> {
     buf_in: BytesMut,
     buf_out: BytesMut,
     last_req: BytesMut,
-    pass_through: bool
+    pass_through: bool,
 }
 
 impl<S> RewindStream<S> {
@@ -28,7 +28,7 @@ impl<S> RewindStream<S> {
             buf_in: BytesMut::new(),
             buf_out: BytesMut::new(),
             last_req: BytesMut::new(),
-            pass_through: false
+            pass_through: false,
         }
     }
 
@@ -40,7 +40,10 @@ impl<S> RewindStream<S> {
 
     /// Pass through data from now on (disables rewinding and HTTP parsing).
     pub fn pass_through(&mut self) {
-        assert!(!self.pass_through, "RewindStream::pass_through called twice");
+        assert!(
+            !self.pass_through,
+            "RewindStream::pass_through called twice"
+        );
         self.pass_through = true;
     }
 }
@@ -93,7 +96,7 @@ impl<S: Write> Write for RewindStream<S> {
     }
 }
 
-impl<S: AsyncRead> AsyncRead for RewindStream<S> { }
+impl<S: AsyncRead> AsyncRead for RewindStream<S> {}
 
 impl<S: AsyncWrite> AsyncWrite for RewindStream<S> {
     fn shutdown(&mut self) -> Result<Async<()>, std::io::Error> {

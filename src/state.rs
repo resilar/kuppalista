@@ -5,14 +5,14 @@ use tungstenite::protocol::Message;
 
 use std;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
 use std::fs;
+use std::fs::{File, OpenOptions};
 use std::net::SocketAddr;
 use std::path::Path;
 
 fn align_len(len: usize) -> usize {
     let n = 4096;
-    n * (1 + (std::cmp::max(len, 1)-1) / n)
+    n * (1 + (std::cmp::max(len, 1) - 1) / n)
 }
 
 fn map(file: &File, len: usize) -> std::io::Result<MmapMut> {
@@ -26,7 +26,7 @@ pub struct State {
     file: File,
     mmap: Option<MmapMut>,
     len: usize,
-    size: usize // len padded to page boundary
+    size: usize, // len padded to page boundary
 }
 
 /// Initial state items.
@@ -38,13 +38,19 @@ impl State {
     pub fn new(json_path: &str, password: Option<String>) -> std::io::Result<State> {
         let exists = Path::new(json_path).exists();
 
-        let file = OpenOptions::new().read(true).write(true).create(true).open(json_path)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(json_path)?;
         file.try_lock_exclusive()?;
 
         let (mmap, len, size) = if exists {
             let file_len = fs::metadata(json_path)?.len() as usize;
             let size = align_len(file_len);
-            if file_len != size { file.set_len(size as u64)?; }
+            if file_len != size {
+                file.set_len(size as u64)?;
+            }
             let mmap = map(&file, size)?;
             let len = mmap.iter().position(|&x| x == 0).unwrap_or(size);
             (mmap, len, size)
@@ -63,7 +69,7 @@ impl State {
             file: file,
             mmap: Some(mmap),
             len: len,
-            size: size
+            size: size,
         })
     }
 
@@ -82,7 +88,9 @@ impl State {
 
         let buf = self.mmap.as_mut().unwrap();
         buf[..len].copy_from_slice(json.as_ref());
-        if len < size { buf[len] = 0; }
+        if len < size {
+            buf[len] = 0;
+        }
         self.len = len;
 
         buf.flush()
