@@ -54,7 +54,7 @@ impl Args {
             .about(env!("CARGO_PKG_DESCRIPTION"))
             .arg(
                 Arg::with_name("address")
-                    .help("Sets the address to which the web server will be bound")
+                    .help("The address to which the web server will be bound")
                     .value_name("IP:PORT")
                     .required(true),
             )
@@ -66,15 +66,15 @@ impl Args {
             )
             .arg(
                 Arg::with_name("pkcs12")
-                    .short("b")
+                    .short("P")
                     .value_name("FILE")
                     .takes_value(true)
                     .help("PKCS #12 bundle for TLS encryption"),
             )
             .arg(
-                Arg::with_name("no-decrypt")
-                    .long("no-decrypt")
-                    .help("Disables asking for password to decrypt PKCS #12 bundle"),
+                Arg::with_name("no-prompt")
+                    .long("no-prompt")
+                    .help("Disable asking for a password to decrypt PKCS #12 bundle"),
             )
             .get_matches();
 
@@ -89,7 +89,7 @@ impl Args {
                 let mut file = File::open(path)?;
                 let mut buffer = vec![];
                 file.read_to_end(&mut buffer)?;
-                let identity = if !matches.is_present("no-decrypt") {
+                let identity = if !matches.is_present("no-prompt") {
                     let password = env::var("PKCS12PASS")
                         .or_else(|_| {
                             eprint!("Password for {}: ", path);
