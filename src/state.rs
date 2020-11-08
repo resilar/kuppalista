@@ -82,7 +82,7 @@ impl State {
             drop(self.mmap.take());
             self.file.set_len(size as u64)?;
             let mmap = map(&self.file, size)?;
-            std::mem::replace(&mut self.mmap, Some(mmap));
+            let _ = std::mem::replace(&mut self.mmap, Some(mmap));
             self.size = size;
         }
 
