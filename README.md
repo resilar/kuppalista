@@ -37,4 +37,4 @@ malicious people on the internet. Use HTTPS and strong passwords.
 
 ## Screenshot
 
-![Frontend](https://i.imgur.com/JMfIYP7.png)
+![Frontend](https://i.imgur.com/Tdsv6QE.png)
