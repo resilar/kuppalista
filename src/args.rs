@@ -60,13 +60,13 @@ impl Args {
             )
             .arg(
                 Arg::with_name("password")
-                    .short("p")
+                    .short('p')
                     .takes_value(true)
                     .help("Password to prevent unwanted access"),
             )
             .arg(
                 Arg::with_name("pkcs12")
-                    .short("P")
+                    .short('P')
                     .value_name("FILE")
                     .takes_value(true)
                     .help("PKCS #12 bundle for TLS encryption"),
